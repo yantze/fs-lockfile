@@ -2,10 +2,14 @@ const lockMap = new Map()
 
 
 function getLock() {
-    this._promise = new Promise(resolve => this.resolve = resolve)
-    this.obtain = () => this._promise
-    this.resolve = null
-    return this
+    const lock = {
+        _promise: null,
+        resolve: null,
+        obtain: null,
+    }
+    lock._promise = new Promise(resolve => lock.resolve = resolve)
+    lock.obtain = () => lock._promise
+    return lock
 }
 
 async function obtainReadLock(fp) {
@@ -15,6 +19,7 @@ async function obtainReadLock(fp) {
             filePath: fp,
             readCount: 0,
             writeInstance: [],
+            readLock: null,
         }
         lockMap.set(fp, lockMeta)
     }
@@ -22,6 +27,11 @@ async function obtainReadLock(fp) {
     if (lockMeta.writeInstance.length) {
         await lockMeta.writeInstance[0].obtain()
     }
+
+    if (!lockMeta.readLock) {
+        lockMeta.readLock = getLock()
+    }
+
     ++lockMeta.readCount
 
     return lockMeta
@@ -34,12 +44,19 @@ async function obtainWriteLock(fp) {
             filePath: fp,
             readCount: 0,
             writeInstance: [],
+            readLock: null,
         }
         lockMap.set(fp, lockMeta)
     }
 
     // 先放进队列中，让其它请求都能获取这个队列
     lockMeta.writeInstance.push(getLock())
+
+    // 检查当前是否有读锁
+    if (lockMeta.readLock) {
+        console.log('---- had read lock')
+        await lockMeta.readLock.obtain()
+    }
 
     if (lockMeta.writeInstance.length > 1) {
         await lockMeta.writeInstance[0].obtain()
@@ -49,11 +66,19 @@ async function obtainWriteLock(fp) {
 }
 
 async function releaseReadLock(lockMeta) {
-    if (lockMeta.writeInstance.length) {
-        throw new Error('Had write lock.')
+    // if (lockMeta.writeInstance.length) {
+    //     throw new Error('Had write lock.')
+    // }
+    if (lockMeta.readLock) {
+        --lockMeta.readCount
+    } else {
+        throw new Error('No read lock found')
     }
 
-    --lockMeta.readCount
+    if (lockMeta.readCount === 0) {
+        lockMeta.readLock.resolve()
+        lockMeta.readLock = null
+    }
 }
 
 async function releaseWriteLock(lockMeta) {
@@ -138,21 +163,31 @@ async function write(fp) {
     })
 }
 
-async function read(fp) {
+async function read(fp, timeout) {
     console.log('request readLockMeta')
     readLockMeta = await obtainReadLock(fp)
     console.log('got read lock meta', readLockMeta)
 
-    process.nextTick(async () => {
-        console.log('request release read lock')
-        await releaseReadLock(readLockMeta)
-        console.log('release read lock', readLockMeta)
-    }, 2000)
+    setTimeout(() => {
+        process.nextTick(async () => {
+            console.log('request release read lock')
+            await releaseReadLock(readLockMeta)
+            console.log('release read lock', readLockMeta)
+        })
+    }, timeout)
 }
 
 
 const fp = 'argument'
+read(fp, 1000)
+read(fp, 2000)
+read(fp, 3000)
+read(fp, 4000)
+read(fp, 4000)
+console.log('开始。。。。')
 write(fp)
-read(fp)
-
-// 释放所有锁可以用 Promise.all 实现请求锁
+console.log('第一个写锁。。。。')
+write(fp)
+read(fp, 1000)
+read(fp, 2000)
+read(fp, 3000)
