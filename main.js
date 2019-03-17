@@ -24,10 +24,9 @@ async function obtainReadLock(fp) {
         lockMap.set(fp, lockMeta)
     }
 
-    const lockNum = lockMeta.writeInstance.length
-    if (lockNum > 0) {
-        // 每次都等待最后一个写锁
-        await lockMeta.writeInstance[lockNum-1].obtain()
+    // 循环等待最后一个写锁
+    while(lockMeta.writeInstance.length) {
+        await lockMeta.writeInstance[lockMeta.writeInstance.length - 1].obtain()
     }
 
     if (!lockMeta.readLock) {
@@ -51,6 +50,12 @@ async function obtainWriteLock(fp) {
         lockMap.set(fp, lockMeta)
     }
 
+    let prevLock = null
+    const lockNum = lockMeta.writeInstance.length
+    if (lockNum >= 1) {
+        prevLock = lockMeta.writeInstance[lockNum-1]
+    }
+
     // 先放进队列中，让其它请求都能获取这个队列
     lockMeta.writeInstance.push(getLock())
 
@@ -61,13 +66,9 @@ async function obtainWriteLock(fp) {
         console.log('====== Release read lock, len:', lockMeta.writeInstance.length)
     }
 
-    // BUG:
-    // 这里会有一个问题是，所有的写锁在等待读锁的时候，
-    // 所有写锁都在等待倒数第二个，这会导致多个写锁请求的时候断链
-    const lockNum = lockMeta.writeInstance.length
-    if (lockNum >= 2) {
-        // 每次都等待最后第二个写锁，因为第一个是自己，要不然就断链了
-        await lockMeta.writeInstance[lockNum-2].obtain()
+    if (prevLock) {
+        // 等待最后一个锁释放
+        await prevLock.obtain()
     }
 
     return lockMeta
@@ -169,27 +170,17 @@ async function testWriteRead() {
 }
 
 async function testReadWriteComplex() {
-
-    read(fp, 1000)
-    read(fp, 2000)
-    read(fp, 3000)
-    read(fp, 4000)
     read(fp, 4000) // +4s
-    console.log('开始。。。。')
     write(fp, 4000) // +4s
-    console.log('第一个写锁。。。。')
-    read(fp, 1000)
-    read(fp, 2000)
-    read(fp, 3000)
-    read(fp, 4000)
-    read(fp, 4000) // +4s
+    read(fp, 4000) // 因为后面有写锁，所以会被写锁插队
     write(fp, 4000) // +4s
     write(fp, 4000) // +4s
     write(fp, 4000) // +4s
     read(fp, 3000)
     read(fp, 4000)
     read(fp, 4000) // +4s
-    // wait 4*7 = 28s
+    // wait 4*6 = 24s
+    console.log('==== Request all completed! ====')
 }
 
 
