@@ -25,9 +25,9 @@ async function obtainReadLock(fp) {
     }
 
     const lockNum = lockMeta.writeInstance.length
-    if (lockNum > 1) {
+    if (lockNum > 0) {
         // 每次都等待最后一个写锁
-        await lockMeta.writeInstance[lockNum-2].obtain()
+        await lockMeta.writeInstance[lockNum-1].obtain()
     }
 
     if (!lockMeta.readLock) {
@@ -56,13 +56,14 @@ async function obtainWriteLock(fp) {
 
     // 检查当前是否有读锁
     if (lockMeta.readLock) {
-        console.log('---- had read lock')
+        console.log('------ Had read lock')
         await lockMeta.readLock.obtain()
+        console.log('====== Release read lock, len:', lockMeta.writeInstance.length)
     }
 
     const lockNum = lockMeta.writeInstance.length
-    if (lockNum > 1) {
-        // 每次都等待最后一个写锁
+    if (lockNum >= 2) {
+        // 每次都等待最后第二个写锁，因为第一个是自己，要不然就断链了
         await lockMeta.writeInstance[lockNum-2].obtain()
     }
 
@@ -70,9 +71,6 @@ async function obtainWriteLock(fp) {
 }
 
 async function releaseReadLock(lockMeta) {
-    // if (lockMeta.writeInstance.length) {
-    //     throw new Error('Had write lock.')
-    // }
     if (lockMeta.readLock) {
         --lockMeta.readCount
     } else {
@@ -82,6 +80,10 @@ async function releaseReadLock(lockMeta) {
     if (lockMeta.readCount === 0) {
         lockMeta.readLock.resolve()
         lockMeta.readLock = null
+    }
+
+    if (lockMeta.readCount === 0 && lockMeta.writeInstance.length === 0) {
+        lockMap.delete(lockMeta.filePath)
     }
 }
 
@@ -93,66 +95,11 @@ async function releaseWriteLock(lockMeta) {
     }
 
     lockMeta.writeInstance.shift()
-    if (!lockMeta.writeInstance.length) {
+    if (lockMeta.readCount === 0 && lockMeta.writeInstance.length === 0) {
         lockMap.delete(lockMeta.filePath)
     }
-
 }
 
-let writeLockMeta = null
-let readLockMeta = null
-async function main() {
-    const fp = 'argument'
-    console.log('request write lock meta')
-    writeLockMeta = await obtainWriteLock(fp)
-    console.log('got write lock meta')
-}
-
-async function second() {
-    const fp = 'argument'
-    console.log('request readLockMeta')
-    readLockMeta = await obtainReadLock(fp)
-    console.log('got read lock meta', readLockMeta)
-}
-
-async function third() {
-    console.log('request release write lock')
-    await releaseWriteLock(writeLockMeta)
-    console.log('release write lock')
-}
-
-async function fouth() {
-    console.log('request release read lock')
-    await releaseReadLock(readLockMeta)
-    console.log('release read lock', readLockMeta)
-}
-
-// main()
-//
-// setTimeout(() => {
-//     second()
-//     second()
-//     second()
-//     second()
-// }, 100)
-//
-// setTimeout(() => {
-//     fouth()
-//     fouth()
-//     fouth()
-//     fouth()
-// }, 1100)
-//
-// setTimeout(() => {
-//     third()
-// }, 1000)
-
-
-// const write = await obtainWriteLock(fp)
-// second()
-// second()
-// second()
-// releaseWriteLock(write)
 
 async function sleep(time) {
     return new Promise(resolve => {
@@ -162,6 +109,9 @@ async function sleep(time) {
     })
 }
 
+
+let writeLockMeta = null
+let readLockMeta = null
 async function write(fp, timeout = 0) {
     console.log('request write lock meta')
     writeLockMeta = await obtainWriteLock(fp)
@@ -176,36 +126,77 @@ async function write(fp, timeout = 0) {
 async function read(fp, timeout = 0) {
     console.log('request readLockMeta')
     readLockMeta = await obtainReadLock(fp)
-    console.log('got read lock meta', readLockMeta)
+    console.log('got read lock meta', readLockMeta.readCount)
 
     await sleep(timeout)
     console.log('request release read lock')
     await releaseReadLock(readLockMeta)
-    console.log('release read lock', readLockMeta)
+    console.log('release read lock', readLockMeta.readCount)
+}
+
+async function testRead() {
+    console.time('testRead')
+    read(fp, 1000)
+    read(fp, 2000)
+    read(fp, 3000)
+    read(fp, 4000)
+    await read(fp, 4000) // +4s
+    console.timeEnd('testRead')
+}
+
+async function testWrite() {
+    console.time('testWrite')
+    await write(fp, 4000) // +4s
+    console.timeEnd('testWrite')
+}
+
+async function testReadWrite() {
+    // console.time('testReadWrite')
+    read(fp, 4000) // +4s
+    write(fp, 4000) // +4s
+    read(fp, 1000) // +1s
+    // console.timeEnd('testReadWrite')
+}
+
+async function testWriteRead() {
+    write(fp, 4000) // +4s
+    read(fp, 1000) // +1s
+    write(fp, 4000) // +4s
+    read(fp, 4000) // +4s
+}
+
+async function testReadWriteComplex() {
+
+    read(fp, 1000)
+    read(fp, 2000)
+    read(fp, 3000)
+    read(fp, 4000)
+    read(fp, 4000) // +4s
+    console.log('开始。。。。')
+    write(fp, 4000) // +4s
+    console.log('第一个写锁。。。。')
+    read(fp, 1000)
+    read(fp, 2000)
+    read(fp, 3000)
+    read(fp, 4000)
+    read(fp, 4000) // +4s
+    write(fp, 4000) // +4s
+    write(fp, 4000) // +4s
+    write(fp, 4000) // +4s
+    read(fp, 3000)
+    read(fp, 4000)
+    read(fp, 4000) // +4s
+    // wait 4*7 = 28s
 }
 
 
 const fp = 'argument'
-read(fp, 1000)
-read(fp, 2000)
-read(fp, 3000)
-read(fp, 4000)
-read(fp, 4000) // +4s
-// console.log('开始。。。。')
-write(fp, 4000) // +4s
-// console.log('第一个写锁。。。。')
-read(fp, 1000)
-read(fp, 2000)
-read(fp, 3000)
-read(fp, 4000)
-read(fp, 4000) // +4s
-write(fp, 4000) // +4s
-write(fp, 4000) // +4s
-write(fp, 4000) // +4s
-// read(fp, 3000)
-// read(fp, 4000)
-// read(fp, 4000) // +4s
-// wait 4*7 = 28s
+// testWrite()
+// testRead()
+// testReadWrite()
+testReadWriteComplex()
+// testWriteRead()
 
-// 可以这样设计测试
-// 写锁是独占的，所以有多少个写锁，应该就至少要有这么长的时间
+// sleep(4500).then(() => {
+//     console.log('map:', lockMap)
+// })
