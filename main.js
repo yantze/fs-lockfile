@@ -61,6 +61,9 @@ async function obtainWriteLock(fp) {
         console.log('====== Release read lock, len:', lockMeta.writeInstance.length)
     }
 
+    // BUG:
+    // 这里会有一个问题是，所有的写锁在等待读锁的时候，
+    // 所有写锁都在等待倒数第二个，这会导致多个写锁请求的时候断链
     const lockNum = lockMeta.writeInstance.length
     if (lockNum >= 2) {
         // 每次都等待最后第二个写锁，因为第一个是自己，要不然就断链了
