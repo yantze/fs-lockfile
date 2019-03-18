@@ -18,15 +18,15 @@ async function obtainReadLock(fp) {
         lockMeta = {
             filePath: fp,
             readCount: 0,
-            writeInstance: [],
+            writeQueue: [],
             readLock: null,
         }
         lockMap.set(fp, lockMeta)
     }
 
     // 循环等待最后一个写锁
-    while(lockMeta.writeInstance.length) {
-        await lockMeta.writeInstance[lockMeta.writeInstance.length - 1].obtain()
+    while(lockMeta.writeQueue.length) {
+        await lockMeta.writeQueue[lockMeta.writeQueue.length - 1].obtain()
     }
 
     if (!lockMeta.readLock) {
@@ -44,26 +44,26 @@ async function obtainWriteLock(fp) {
         lockMeta = {
             filePath: fp,
             readCount: 0,
-            writeInstance: [],
+            writeQueue: [],
             readLock: null,
         }
         lockMap.set(fp, lockMeta)
     }
 
     let prevLock = null
-    const lockNum = lockMeta.writeInstance.length
+    const lockNum = lockMeta.writeQueue.length
     if (lockNum >= 1) {
-        prevLock = lockMeta.writeInstance[lockNum-1]
+        prevLock = lockMeta.writeQueue[lockNum-1]
     }
 
     // 先放进队列中，让其它请求都能获取这个队列
-    lockMeta.writeInstance.push(getLock())
+    lockMeta.writeQueue.push(getLock())
 
     // 检查当前是否有读锁
     if (lockMeta.readLock) {
         console.log('------ Had read lock')
         await lockMeta.readLock.obtain()
-        console.log('====== Release read lock, len:', lockMeta.writeInstance.length)
+        console.log('====== Release read lock, len:', lockMeta.writeQueue.length)
     }
 
     if (prevLock) {
@@ -86,20 +86,20 @@ async function releaseReadLock(lockMeta) {
         lockMeta.readLock = null
     }
 
-    if (lockMeta.readCount === 0 && lockMeta.writeInstance.length === 0) {
+    if (lockMeta.readCount === 0 && lockMeta.writeQueue.length === 0) {
         lockMap.delete(lockMeta.filePath)
     }
 }
 
 async function releaseWriteLock(lockMeta) {
-    if (lockMeta.writeInstance.length) {
-        lockMeta.writeInstance[0].resolve()
+    if (lockMeta.writeQueue.length) {
+        lockMeta.writeQueue[0].resolve()
     } else {
         throw new Error('No write lock.')
     }
 
-    lockMeta.writeInstance.shift()
-    if (lockMeta.readCount === 0 && lockMeta.writeInstance.length === 0) {
+    lockMeta.writeQueue.shift()
+    if (lockMeta.readCount === 0 && lockMeta.writeQueue.length === 0) {
         lockMap.delete(lockMeta.filePath)
     }
 }
