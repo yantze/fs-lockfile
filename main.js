@@ -1,5 +1,13 @@
-const lockMap = new Map()
+const fs = require('fs')
 
+const { promisify } = require('util')
+
+const fsp = {
+    readFile : promisify(fs.readFile),
+    writeFile : promisify(fs.writeFile),
+}
+
+const lockMap = new Map()
 
 function getLock() {
     const lock = {
@@ -61,9 +69,7 @@ async function obtainWriteLock(fp) {
 
     // 检查当前是否有读锁
     if (lockMeta.readLock) {
-        console.log('------ Had read lock')
         await lockMeta.readLock.obtain()
-        console.log('====== Release read lock, len:', lockMeta.writeQueue.length)
     }
 
     if (prevLock) {
@@ -104,93 +110,31 @@ async function releaseWriteLock(lockMeta) {
     }
 }
 
+async function read(fp) {
+    const lockMeta = await obtainReadLock(fp)
 
-async function sleep(time) {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve()
-        }, time)
-    })
+    try {
+        return await fsp.readFile(fp)
+    } catch (readError) {
+        throw readError
+    } finally {
+        await releaseReadLock(lockMeta)
+    }
 }
 
+async function write(fp, content) {
+    const lockMeta = await obtainWriteLock(fp)
 
-let writeLockMeta = null
-let readLockMeta = null
-async function write(fp, timeout = 0) {
-    console.log('request write lock meta')
-    writeLockMeta = await obtainWriteLock(fp)
-    console.log('got write lock meta')
-
-    await sleep(timeout)
-    console.log('request release write lock')
-    await releaseWriteLock(writeLockMeta)
-    console.log('release write lock')
+    try {
+        return await fsp.writeFile(fp, content)
+    } catch (writeError) {
+        throw writeError
+    } finally {
+        await releaseWriteLock(lockMeta)
+    }
 }
 
-async function read(fp, timeout = 0) {
-    console.log('request readLockMeta')
-    readLockMeta = await obtainReadLock(fp)
-    console.log('got read lock meta', readLockMeta.readCount)
-
-    await sleep(timeout)
-    console.log('request release read lock')
-    await releaseReadLock(readLockMeta)
-    console.log('release read lock', readLockMeta.readCount)
+module.exports = {
+    read,
+    write,
 }
-
-async function testRead() {
-    console.time('testRead')
-    read(fp, 1000)
-    read(fp, 2000)
-    read(fp, 3000)
-    read(fp, 4000)
-    await read(fp, 4000) // +4s
-    console.timeEnd('testRead')
-}
-
-async function testWrite() {
-    console.time('testWrite')
-    await write(fp, 4000) // +4s
-    console.timeEnd('testWrite')
-}
-
-async function testReadWrite() {
-    // console.time('testReadWrite')
-    read(fp, 4000) // +4s
-    write(fp, 4000) // +4s
-    read(fp, 1000) // +1s
-    // console.timeEnd('testReadWrite')
-}
-
-async function testWriteRead() {
-    write(fp, 4000) // +4s
-    read(fp, 1000) // +1s
-    write(fp, 4000) // +4s
-    read(fp, 4000) // +4s
-}
-
-async function testReadWriteComplex() {
-    read(fp, 4000) // +4s
-    write(fp, 4000) // +4s
-    read(fp, 4000) // 因为后面有写锁，所以会被写锁插队
-    write(fp, 4000) // +4s
-    write(fp, 4000) // +4s
-    write(fp, 4000) // +4s
-    read(fp, 3000)
-    read(fp, 4000)
-    read(fp, 4000) // +4s
-    // wait 4*6 = 24s
-    console.log('==== Request all completed! ====')
-}
-
-
-const fp = 'argument'
-// testWrite()
-// testRead()
-// testReadWrite()
-testReadWriteComplex()
-// testWriteRead()
-
-// sleep(4500).then(() => {
-//     console.log('map:', lockMap)
-// })
