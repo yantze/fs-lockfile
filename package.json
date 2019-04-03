@@ -1,5 +1,5 @@
 {
-  "name": "fs-lock",
+  "name": "fs-lockfile",
   "version": "0.0.1",
   "description": "Managing the reading and writing of files in the application.",
   "author": "Yantze <ivastiny@gmail.com> (https://vastiny.com)",
