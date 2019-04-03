@@ -1,9 +1,10 @@
+const path = require('path')
 const { read, write } = require('../main.js')
 
-const fp = './test.txt'
+const filePath = path.join(__dirname, './test.txt')
 
-write(fp, 'bbbb').then(data => {
-    console.log('data:', data)
+write(filePath, 'test data').then(data => {
+    console.log('data:', data.toString())
 }).catch(err => {
-    console.log('err:', err)
+    console.error('err:', err)
 })
