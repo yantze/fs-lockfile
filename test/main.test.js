@@ -1,10 +1,18 @@
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+
 const expect = require('chai').expect
-const assert = require('assert')
 
-const { read, write } = require('../main.js')
+const { dump } = require('dumper.js')
 
-const filePath = '/Users/yantze/a.txt'
+const { read, write, obtainReadLock, obtainWriteLock, releaseReadLock, releaseWriteLock } = require('../main.js')
+
+const filePath = path.join(__dirname, './test.txt')
 const content = 'content test'
+
+
+
 
 describe('Simple write & read test', () => {
 
@@ -16,27 +24,48 @@ describe('Simple write & read test', () => {
 
     it('should return file content', async () => {
         const readCotnent = await read(filePath)
-        assert.equal(content, content.toString())
+        expect(content).to.equal(content.toString())
     })
 
-    it('should throw error when read file not found', () => {
-        return read(filePath+'1')
+    it('should throw out an error when read file not found', () => {
+        read(filePath+'1').catch(e => {
+            expect(e).to.be.an('error')
+        })
     })
 
-    it('should throw error when write file fail', () => {
-        return write(filePath+'2', NaN)
+    it('should throw out an error when write file fail', done => {
+        // no privilege access file
+        write(filePath+'2', content).catch(e => {
+            expect(e).to.be.an('error')
+            done()
+        })
     })
+
+    it('should throw out an error when content is undefined', () => {
+        write(filePath, undefined).catch(e => {
+            expect(e).to.be.an('error')
+        })
+    })
+
+    it('should throw out an error when content is null', () => {
+        write(filePath, null).catch(e => {
+            expect(e).to.be.an('error')
+        })
+    })
+
 })
 
 describe('Simple continue write lock', () => {
-    it('should write & write without error', async () => {
+
+    it('should write & write without error', async function () {
         await write(filePath, content)
         await write(filePath, content)
     })
 })
 
 describe('Simple continue read lock', () => {
-    it('should read & read & read without error', async () => {
+
+    it('should read & read & read without error', async function () {
         await read(filePath)
         await read(filePath)
         await read(filePath)
@@ -46,16 +75,16 @@ describe('Simple continue read lock', () => {
 describe('Read & Write by turns', () => {
     it('should read & write, result to origin content', done => {
         read(filePath).then((data) => {
-            assert.equal(data.toString(), content)
+            expect(data.toString()).to.equal(content)
             done()
         })
         write(filePath, content+'1')
     })
 
-    it('should write & read & write, result to final write content', done => {
+    it('should write & read & write, result to final write content', function (done) {
         write(filePath, content)
         read(filePath).then((data) => {
-            assert.equal(data.toString(), (content + '2'))
+            expect(data.toString()).to.equal(content + '2')
             done()
         })
         write(filePath, content+'1')
@@ -63,101 +92,64 @@ describe('Read & Write by turns', () => {
     })
 })
 
-describe('Time spent of Read & Write', () => {
-    it('should cost 1 second: 3 read 500ms & write 500ms', () => {
-    
+describe('Time spent of Read & Write', function () {
+    const fsp = {
+        readFile : promisify(fs.readFile),
+        writeFile : promisify(fs.writeFile),
+    }
+
+    const sleep = timeout => new Promise(resolve => setTimeout(resolve, timeout))
+
+    async function mock_read(fp, delay) {
+        if (!path.isAbsolute(fp)) throw new Error('Must be an absolute path.')
+
+        const lockMeta = await obtainReadLock(fp)
+
+        try {
+            return await fsp.readFile(fp)
+        } catch (readError) {
+            throw readError
+        } finally {
+            await sleep(delay)
+            await releaseReadLock(lockMeta)
+        }
+    }
+
+    async function mock_write(fp, content, delay) {
+        if (!path.isAbsolute(fp)) throw new Error('Must be an absolute path.')
+
+        const lockMeta = await obtainWriteLock(fp)
+
+        try {
+            return await fsp.writeFile(fp, content)
+        } catch (writeError) {
+            throw writeError
+        } finally {
+            await sleep(delay)
+            await releaseWriteLock(lockMeta)
+        }
+    }
+
+    it('should cost 1 second: 3 read 500ms & write 500ms', async function () {
+        const timestamp = Date.now()
+        mock_read(filePath, 500)
+        mock_read(filePath, 500)
+        mock_read(filePath, 500)
+        await mock_write(filePath, content, 500)
+
+        const cost = Date.now() - timestamp
+        expect(cost > 1000 && cost < 1100).to.be.true
     })
 
-    it('should cost 1.5 second: write 500ms & read 500ms & write 500ms', () => {
-    
+    it('should cost 1.5 second: write 500ms & read 500ms & write 500ms', function (done) {
+        const timestamp = Date.now()
+        mock_write(filePath, content, 500)
+        mock_read(filePath, 500).then(() => {
+            const cost = Date.now() - timestamp
+            expect(cost > 1500 && cost < 1600).to.be.true
+            done()
+        })
+        mock_write(filePath, content, 500)
     })
 })
 
-
-/**
- * 插入代码测试耗费时长
- * 并发测试的方法
- * 中间件文件写入是否要判断 undefined 或者 null
- * expect 和 assert 区别
- */
-
-
-/*
-async function sleep(time) {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve()
-        }, time)
-    })
-}
-
-
-let writeLockMeta = null
-let readLockMeta = null
-async function writeCase(fp, timeout = 0) {
-    console.log('request write lock meta')
-    writeLockMeta = await obtainWriteLock(fp)
-    console.log('got write lock meta')
-
-    await sleep(timeout)
-    console.log('request release write lock')
-    await releaseWriteLock(writeLockMeta)
-    console.log('release write lock')
-}
-
-async function readCase(fp, timeout = 0) {
-    console.log('request readLockMeta')
-    readLockMeta = await obtainReadLock(fp)
-    console.log('got read lock meta', readLockMeta.readCount)
-
-    await sleep(timeout)
-    console.log('request release read lock')
-    await releaseReadLock(readLockMeta)
-    console.log('release read lock', readLockMeta.readCount)
-}
-
-async function testRead() {
-    console.time('testRead')
-    readCase(fp, 1000)
-    readCase(fp, 2000)
-    readCase(fp, 3000)
-    readCase(fp, 4000)
-    await readCase(fp, 4000) // +4s
-    console.timeEnd('testRead')
-}
-
-async function testWrite() {
-    console.time('testWrite')
-    await writeCase(fp, 4000) // +4s
-    console.timeEnd('testWrite')
-}
-
-async function testReadWrite() {
-    // console.time('testReadWrite')
-    readCase(fp, 4000) // +4s
-    writeCase(fp, 4000) // +4s
-    readCase(fp, 1000) // +1s
-    // console.timeEnd('testReadWrite')
-}
-
-async function testWriteRead() {
-    writeCase(fp, 4000) // +4s
-    readCase(fp, 1000) // +1s
-    writeCase(fp, 4000) // +4s
-    readCase(fp, 4000) // +4s
-}
-
-async function testReadWriteComplex() {
-    readCase(fp, 4000) // +4s
-    writeCase(fp, 4000) // +4s
-    readCase(fp, 4000) // 因为后面有写锁，所以会被写锁插队
-    writeCase(fp, 4000) // +4s
-    writeCase(fp, 4000) // +4s
-    writeCase(fp, 4000) // +4s
-    readCase(fp, 3000)
-    readCase(fp, 4000)
-    readCase(fp, 4000) // +4s
-    // wait 4*6 = 24s
-    console.log('==== Request all completed! ====')
-}
-*/
