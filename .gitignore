@@ -1,0 +1,6 @@
+.nyc_output
+test/test.txt
+
+node_modules
+.DS_store
+Thumbs.db
