@@ -1,13 +1,13 @@
 {
   "name": "fs-lock",
   "version": "0.0.1",
-  "description": "",
+  "description": "Managing the reading and writing of files in the application.",
+  "author": "Yantze <ivastiny@gmail.com> (https://vastiny.com)",
   "main": "index.js",
   "scripts": {
     "test": "nyc mocha"
   },
   "keywords": [],
-  "author": "",
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
