@@ -6,13 +6,13 @@ Only one action can manipulate file in the mean time.
 
 ## Method of fs-lockfile
 
-- read(filePath): Promise
+- **read(filePath): Promise**
 
-- write(filePath, content): Promise
+- **write(filePath, content): Promise**
 
 ## Usage
 
-Example:
+**Example:**
 ```js
 const path = require('path')
 const { read, write } = require('fs-lockfile')
