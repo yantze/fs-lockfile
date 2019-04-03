@@ -4,6 +4,13 @@ Managing the reading and writing of files in the application.
 
 Only one action can manipulate file in the mean time.
 
+No Dependencies.
+
+## Installation
+```
+npm i --save fs-lockfile
+```
+
 ## Method of fs-lockfile
 
 - **read(filePath): Promise**
@@ -17,13 +24,17 @@ Only one action can manipulate file in the mean time.
 const path = require('path')
 const { read, write } = require('fs-lockfile')
 
-const filePath = path.join(__dirname, './test.txt')
+async function demo(filePath) {
 
-write(filePath, 'test data').then(data => {
-    console.log('data:', data.toString())
-}).catch(err => {
-    console.error('err:', err)
-})
+    await write(filePath, 'test data')
+
+    const content = await read(filePath)
+
+    console.log('File content:', content.toString())
+}
+ 
+const filePath = path.join(__dirname, './test.txt')
+demo(filePath)
 ```
 
 ## LISENCE

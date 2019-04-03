@@ -4,7 +4,7 @@ const { promisify } = require('util')
 
 const expect = require('chai').expect
 
-const { read, write, obtainReadLock, obtainWriteLock, releaseReadLock, releaseWriteLock } = require('../main.js')
+const { read, write, obtainReadLock, obtainWriteLock, releaseReadLock, releaseWriteLock } = require('../index.js')
 
 const filePath = path.join(__dirname, './test.txt')
 const content = 'content test'
