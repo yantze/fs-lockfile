@@ -4,3 +4,7 @@ test/test.txt
 node_modules
 .DS_store
 Thumbs.db
+
+lock-mechasim.js
+lock-version1.js
+lock-version2.js

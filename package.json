@@ -1,6 +1,6 @@
 {
-  "name": "test-lock",
-  "version": "1.0.0",
+  "name": "fs-lock",
+  "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -8,10 +8,8 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "mutexify": "^1.2.0"
-  },
+  "license": "MIT",
+  "dependencies": {},
   "devDependencies": {
     "chai": "^4.2.0",
     "mocha": "^6.0.2",
