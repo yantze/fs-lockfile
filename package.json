@@ -1,12 +1,22 @@
 {
   "name": "fs-lockfile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Managing the reading and writing of files in the application.",
   "author": "Yantze <ivastiny@gmail.com> (https://vastiny.com)",
   "main": "index.js",
   "scripts": {
     "test": "nyc mocha"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yantze/fs-lockfile.git"
+  },
+  "keywords": [
+    "fs",
+    "lock",
+    "mutex",
+    "javascript"
+  ],
   "keywords": [],
   "license": "MIT",
   "dependencies": {},
