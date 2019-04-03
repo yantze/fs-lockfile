@@ -1,4 +1,5 @@
 const fs = require('fs')
+const path = require('path')
 
 const { promisify } = require('util')
 
@@ -111,6 +112,8 @@ async function releaseWriteLock(lockMeta) {
 }
 
 async function read(fp) {
+    if (!path.isAbsolute(fp)) throw new Error('Must be an absolute path.')
+
     const lockMeta = await obtainReadLock(fp)
 
     try {
@@ -123,6 +126,10 @@ async function read(fp) {
 }
 
 async function write(fp, content) {
+    if (!path.isAbsolute(fp)) throw new Error('Must be an absolute path.')
+
+    if (content === undefined || content === null) throw new Error('Content can not be undefined or null.')
+
     const lockMeta = await obtainWriteLock(fp)
 
     try {
@@ -137,4 +144,8 @@ async function write(fp, content) {
 module.exports = {
     read,
     write,
+    obtainReadLock,
+    obtainWriteLock,
+    releaseReadLock,
+    releaseWriteLock,
 }
