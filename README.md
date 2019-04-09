@@ -17,6 +17,14 @@ npm i --save fs-lockfile
 
 - **write(filePath, content): Promise**
 
+- **obtainReadLock(filePath): Object**
+
+- **obtainWriteLock(filePath): Object**
+
+- **releaseReadLock(lockMeta): undefined**
+
+- **releaseWriteLock(lockMeta): undefined**
+
 ## Usage
 
 **Example:**
@@ -35,6 +43,23 @@ async function demo(filePath) {
  
 const filePath = path.join(__dirname, './test.txt')
 demo(filePath)
+```
+
+Another example:
+```js
+async function read(fp) {
+    if (!path.isAbsolute(fp)) throw new Error('Must be an absolute path.')
+
+    const lockMeta = await obtainReadLock(fp)
+
+    try {
+        return await fsp.readFile(fp)
+    } catch (readError) {
+        throw readError
+    } finally {
+        await releaseReadLock(lockMeta)
+    }
+}
 ```
 
 ## LISENCE
