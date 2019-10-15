@@ -38,7 +38,7 @@ async function obtainReadLock(fp) {
     }
 
     if (!lockMeta.readLock) {
-        lockMeta.readLock = getLock()
+        lockMeta.readLock = generateLock()
     }
 
     ++lockMeta.readCount
