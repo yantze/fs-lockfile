@@ -1,6 +1,6 @@
 {
   "name": "fs-lockfile",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Managing the reading and writing of files in the application.",
   "author": "Yantze <ivastiny@gmail.com> (https://vastiny.com)",
   "main": "index.js",
@@ -15,9 +15,9 @@
     "fs",
     "lock",
     "mutex",
-    "javascript"
+    "javascript",
+    "nodejs"
   ],
-  "keywords": [],
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {

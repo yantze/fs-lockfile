@@ -10,14 +10,13 @@ const fsp = {
 
 const lockMap = new Map()
 
-function getLock() {
+function generateLock() {
     const lock = {
-        _promise: null,
         resolve: null,
         obtain: null,
     }
-    lock._promise = new Promise(resolve => lock.resolve = resolve)
-    lock.obtain = () => lock._promise
+    const promise = new Promise(resolve => lock.resolve = resolve)
+    lock.obtain = () => promise
     return lock
 }
 
@@ -66,7 +65,7 @@ async function obtainWriteLock(fp) {
     }
 
     // 先放进队列中，让其它请求都能获取这个队列
-    lockMeta.writeQueue.push(getLock())
+    lockMeta.writeQueue.push(generateLock())
 
     // 检查当前是否有读锁
     if (lockMeta.readLock) {
@@ -118,8 +117,6 @@ async function read(fp) {
 
     try {
         return await fsp.readFile(fp)
-    } catch (readError) {
-        throw readError
     } finally {
         await releaseReadLock(lockMeta)
     }
@@ -134,8 +131,6 @@ async function write(fp, content) {
 
     try {
         return await fsp.writeFile(fp, content)
-    } catch (writeError) {
-        throw writeError
     } finally {
         await releaseWriteLock(lockMeta)
     }
